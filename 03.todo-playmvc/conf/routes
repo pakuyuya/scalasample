@@ -5,11 +5,11 @@
 # Home page
 GET        /                                  controllers.Application.index
 
-GET        /tasks/{query}                     controllers.Application.get
+GET        /tasks                             controllers.Application.search
 
-GET        /task/add/{context}                controllers.Application.add
-GET        /task/update/{id}/{context}        controllers.Application.update
-GET        /task/delete/{id}                  controllers.Application.delete
+POST       /task/add                          controllers.Application.add
+POST       /task/update                       controllers.Application.update
+POST       /task/delete                       controllers.Application.remove
 
 # Map static resources from the /public folder to the /assets URL path
 GET        /assets/*file                      controllers.Assets.versioned(path="/public", file: Asset)

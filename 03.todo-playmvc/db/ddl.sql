@@ -1,5 +1,5 @@
 create table TASKS(
-  ID bigint auto_increment,
-  TEXT varchar(255),
-  CREATE_AT timestamp
+  ID   int auto_increment,
+  TEXT varchar(255)      not null,
+  DONE boolean            not null
 );

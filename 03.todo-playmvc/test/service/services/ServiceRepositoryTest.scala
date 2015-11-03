@@ -10,7 +10,7 @@ import org.specs2.specification._
  */
 class Dummy  extends Specification with Mockito  {
   def is = s2""
-  
+
   class ServiceRepositoryTest extends ServiceRepository  {
     lazy val tasksService = mock[TasksService]
   }

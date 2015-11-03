@@ -1,51 +1,58 @@
 package service.services
 
-import models.Tasks
+import dtos.TaskDTO
+import models.Tables
+import models.Tables._
 import slick.driver.H2Driver.api._
+import slick.driver.JdbcProfile
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
+
+import play.api.Logger
 
 /**
  * Tasksのサービスコンポーネント
  */
 trait TasksService {
+
   /**
-   * Taskを取得する
-   * @param text 検索キーワード
+   * Taskを主キー検索
+   * @param id
+   * @param db
+   * @return
    */
-  def findByText(text: String)(implicit session:Session)  : Seq[TaskDTO]
+  def findByPK(id: Int)(implicit db:JdbcProfile#Backend#Database) : Future[TaskDTO]
+
+  /**
+   * テキストに一致するTaskを取得する
+   * @param text 検索キーワード
+   * @param db
+   */
+  def findByText(text: Option[String])(implicit db:JdbcProfile#Backend#Database)  : Future[Seq[TaskDTO]]
 
   /**
    * Taskを追加する
    * @param task
+   * @param db
    * @return 新規採番ID
    */
-  def add(task: TaskDTO)(implicit session:Session)  : Int
+  def add(task: TaskDTO)(implicit db:JdbcProfile#Backend#Database)  : Future[Int]
 
   /**
    * Taskの内容を更新する
    * @param task
+   * @param db
    */
-  def update(task: TaskDTO)(implicit session:Session)  : Unit
+  def update(task: TaskDTO)(implicit db:JdbcProfile#Backend#Database)  : Future[Int]
 
   /**
    * タスクを削除する
    * @param id
+   * @param db
    */
-  def delete(id: Int)(implicit session:Session)  : Unit
-}
-
-/**
- * TaskのDTO
- * @param id
- * @param text
- * @param done
- */
-case class TaskDTO(id: Option[Int], text: String, done: Boolean) {
-
+  def delete(id: Int)(implicit db:JdbcProfile#Backend#Database)  : Future[Int]
 }
 
 /**
@@ -53,54 +60,74 @@ case class TaskDTO(id: Option[Int], text: String, done: Boolean) {
  */
 class TasksServiceImpl extends TasksService {
 
-  override def findByText(text: String)(implicit session:Session) : Seq[TaskDTO] = {
-    var ret:Seq[TaskDTO] = null
+  override def findByPK(id: Int)(implicit db:JdbcProfile#Backend#Database) : Future[TaskDTO] = {
 
-    val condText : String = if(text != null) text + "%" else "%"
-    lazy val tasks = TableQuery[Tasks]
+    Logger.debug("run TasksServiceImpl#findByPK()")
 
-    val query = tasks.filter(_.text like condText).result
-    val f = session.database.run(query)
+    // DBIOActionを生成し、db.run()でSQLにコンパイル・実行。
+    val query = Tasks.filter(_.id === id)
+                      .result.head
+    val f: Future[Tables.Tasks#TableElementType] = db.run(query)
 
-    f.onSuccess {
-      case v => ret = v.map(TaskDTO.tupled)
-    }
-    Await.ready(f, Duration.Inf)
-
-    ret
+    // Future[Tasks]をFuture[STaskDTO]にmapして返す
+    f.map { task => TaskDTO(Some(task.id), task.text, task.done) }
   }
 
-  override def add(task: TaskDTO)(implicit session:Session) : Int = {
-    lazy val tasks = TableQuery[Tasks]
-    var ret : Int = -1
+  override def findByText(text: Option[String] = None)(implicit db:JdbcProfile#Backend#Database) : Future[Seq[TaskDTO]] = {
 
-    var action = (tasks returning tasks.map(_.id)) += TaskDTO.unapply(task).get
+    Logger.info("run TasksServiceImpl#findByText()")
 
-    val f = session.database.run(action)
-
-    f.onSuccess {
-      case v => ret = v
+    val condText : String = text match{
+      case Some(t) => "%" + t + "%"
+      case None    => "%"
     }
 
-    ret
-    // 旧コード
-//    val action = tasks.forceInsert(TaskDTO.unapply(task).get)
-//    val f = session.database.run(action)
-//    Await.ready(f, Duration.Inf)
+    // DBIOActionを生成し、db.run()でSQLにコンパイル・実行。
+    val query = Tasks.filter(_.text like condText)
+                      .sortBy(row => row.id.asc)
+                      .result
+    val f:Future[Seq[Tables.Tasks#TableElementType]] = db.run(query)
+
+    // Future[Seq[Tasks]]をFuture[Seq[TaskDTO]]にmapして返す
+    f .map { tasks => tasks.map { task => TaskDTO(Some(task.id), task.text, task.done) } }
   }
-  override def update(task: TaskDTO)(implicit session:Session) = {
-    lazy val tasks = TableQuery[Tasks]
-    val action = tasks.update(TaskDTO.unapply(task).get)
 
-    val f = session.database.run(action)
-    Await.ready(f, Duration.Inf)
+  override def add(task: TaskDTO)(implicit db:JdbcProfile#Backend#Database) : Future[Int] = {
+
+    Logger.info("run TasksServiceImpl#add()")
+
+    lazy val tasks = Tasks
+
+    // Insert値をモデルに設定
+    val row = TasksRow(0, task.text, task.done)
+
+    // DBIOActionの生成。run時にSQLにコンパイルされる
+    val action = (tasks returning tasks.map(_.id)) += row
+
+    // 非同期実行し、Future[Int]を返す
+    db.run(action)
   }
-  override def delete(id: Int)(implicit session:Session)  : Unit = {
-    lazy val tasks = TableQuery[Tasks]
+  override def update(task: TaskDTO)(implicit db:JdbcProfile#Backend#Database) : Future[Int] = {
 
-    val action = tasks.filter(_.id === id).delete
+    Logger.info("run TasksServiceImpl#update()")
 
-    val f = session.database.run(action)
-    Await.ready(f, Duration.Inf)
+    // Update値をモデルに設定
+    val row = TasksRow(task.id.get, task.text, task.done)
+
+    // DBIOActionの生成。run時にSQLにコンパイルされる
+    val action = Tasks.filter(t => t.id === task.id.get).update(row)
+
+    // 非同期実行し、Future[Int]を返す
+    db.run(action)
+  }
+  override def delete(id: Int)(implicit db:JdbcProfile#Backend#Database)  : Future[Int] = {
+
+    Logger.info("run TasksServiceImpl#delete()")
+
+    // DBIOActionの生成。run時にSQLにコンパイルされる
+    val action = Tasks.filter(_.id === id).delete
+
+    // 非同期実行し、Future[Int]を返す
+    db.run[Int](action)
   }
 }

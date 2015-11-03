@@ -1,5 +1,46 @@
-@(message: String)
+@import dtos._
+@(tasks: Seq[TaskDTO])
 
-@main("Welcome to Play") {
-    @message
+
+
+@main(
+    title = "TODO MVC-Play(server script only)",
+    jsfiles = Seq("js/index.js"),
+    cssfiles= Seq("stylesheets/index.css")
+) {
+    <sction class="todoapp">
+        <headear>
+            <h1>todos</h1>
+        </headear>
+        <section class="todos">
+            <form action="@routes.Application.add()" method="POST">
+                <input type="text" name="content" class="newtask" placeholder="What needs to be done?" />
+                <button type="submit" class="hide"></button>
+            </form>
+
+            @if(tasks != null && !tasks.isEmpty) {
+                <ul>
+                    @for(task <- tasks) {
+                        <li class="task @{ if (task.done) "done"}" data-id="@task.id" data-text="@task.text">
+                            <span class="task-done"><input type="checkbox" class="chk-task-done toggle" @{ if (task.done) "checked" } ></span>
+                            <span class="task-text">@task.text</span>
+                            <span class="task-remove"><button type="button" class="btn-task-remove">×</button></span>
+                        </li>
+                    }
+                </ul>
+            }
+
+            @* 更新用フォーム。JavaScriptに頼る。クッソ汚い *@
+            <form id="update-form" action="@routes.Application.update()" class="hide" method="POST">
+                <input type="hidden"   name="id" />
+                <input type="hidden"   name="content" />
+                <input type="checkbox" name="done" value="true" />
+            </form>
+            <form id="remove-form" action="@routes.Application.remove()" class="hide" method="POST">
+                <input type="hidden" name="id" />
+                <input type="hidden"   name="content" />
+                <input type="checkbox" name="done" value="true" />
+            </form>
+        </section>
+    </sction>
 }

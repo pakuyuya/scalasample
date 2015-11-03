@@ -19,14 +19,14 @@ trait Tables {
   def ddl = schema
 
   /** Entity class storing rows of table Tasks
-    *  @param id Database column ID SqlType(INTEGER), AutoInc
-    *  @param text Database column TEXT SqlType(VARCHAR), Length(255,true)
-    *  @param done Database column DONE SqlType(BOOLEAN) */
+   *  @param id Database column ID SqlType(INTEGER), AutoInc
+   *  @param text Database column TEXT SqlType(VARCHAR), Length(255,true)
+   *  @param done Database column DONE SqlType(BOOLEAN) */
   case class TasksRow(id: Int, text: String, done: Boolean)
   /** GetResult implicit for fetching TasksRow objects using plain SQL queries */
   implicit def GetResultTasksRow(implicit e0: GR[Int], e1: GR[String], e2: GR[Boolean]): GR[TasksRow] = GR{
     prs => import prs._
-      TasksRow.tupled((<<[Int], <<[String], <<[Boolean]))
+    TasksRow.tupled((<<[Int], <<[String], <<[Boolean]))
   }
   /** Table description of table TASKS. Objects of this class serve as prototypes for rows in queries. */
   class Tasks(_tableTag: Tag) extends Table[TasksRow](_tableTag, "TASKS") {
